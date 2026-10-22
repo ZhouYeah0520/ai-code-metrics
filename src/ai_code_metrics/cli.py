@@ -26,6 +26,8 @@ def install_hook(cwd: str | Path = ".") -> Path:
         "esac\n",
         encoding="utf-8", newline="\n",
     )
+    # Git for Windows ignores this bit; Unix runners need it to execute hooks.
+    hook.chmod(0o755)
     return hook
 
 

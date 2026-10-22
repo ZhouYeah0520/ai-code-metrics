@@ -76,7 +76,8 @@ class AutoFixTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir, \
              patch("ai_code_metrics.cli.git", side_effect=[temp_dir, ".git/hooks"]), \
              patch("ai_code_metrics.cli.Path.mkdir") as mkdir, \
-             patch("ai_code_metrics.cli.Path.write_text") as write_text:
+             patch("ai_code_metrics.cli.Path.write_text") as write_text, \
+             patch("ai_code_metrics.cli.Path.chmod") as chmod:
             from ai_code_metrics.cli import install_hook
             hook = install_hook(cwd=temp_dir)
         expected = Path(temp_dir).resolve() / ".git" / "hooks" / "post-commit"
@@ -84,6 +85,7 @@ class AutoFixTests(unittest.TestCase):
         mkdir.assert_called_once_with(parents=True, exist_ok=True)
         self.assertIn("--cwd", write_text.call_args.args[0])
         self.assertIn("repo_root=$(git rev-parse --show-toplevel)", write_text.call_args.args[0])
+        chmod.assert_called_once()
 
 
 if __name__ == "__main__":
