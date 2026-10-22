@@ -10,18 +10,19 @@ from .fix import auto_fix
 from .git import GitError, add_ai_note, git, list_marked, ratio
 
 
-def install_hook() -> Path:
-    root = Path(git(["rev-parse", "--show-toplevel"])).resolve()
-    hooks = Path(git(["rev-parse", "--git-path", "hooks"]))
+def install_hook(cwd: str | Path = ".") -> Path:
+    root = Path(git(["rev-parse", "--show-toplevel"], cwd=cwd)).resolve()
+    hooks = Path(git(["rev-parse", "--git-path", "hooks"], cwd=root))
     if not hooks.is_absolute():
         hooks = (root / hooks).resolve()
     hooks.mkdir(parents=True, exist_ok=True)
     hook = hooks / "post-commit"
     hook.write_text(
         "#!/bin/sh\n"
-        "message=$(git log -1 --pretty=%B)\n"
+        "repo_root=$(git rev-parse --show-toplevel) || exit 1\n"
+        "message=$(git -C \"$repo_root\" log -1 --pretty=%B)\n"
         "case \"$message\" in\n"
-        "  *\"[AI]\"*) python -m ai_code_metrics mark --commit HEAD --tool hook >/dev/null || exit $? ;;\n"
+        "  *\"[AI]\"*) python -m ai_code_metrics mark --cwd \"$repo_root\" --commit HEAD --tool hook >/dev/null || exit $? ;;\n"
         "esac\n",
         encoding="utf-8", newline="\n",
     )
@@ -54,7 +55,8 @@ def main(argv: list[str] | None = None) -> int:
     fix.add_argument("--cwd", default=".")
     fix.add_argument("--rounds", type=int, default=5)
     fix.add_argument("--timeout", type=int, default=300)
-    sub.add_parser("install-hook", help="Install an opt-in [AI] post-commit hook")
+    hook = sub.add_parser("install-hook", help="Install an opt-in [AI] post-commit hook")
+    hook.add_argument("--cwd", default=".")
     args = parser.parse_args(argv)
     try:
         if args.command == "mark":
@@ -80,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0 if result["fixed"] else 1
         elif args.command == "install-hook":
-            print(install_hook())
+            print(install_hook(args.cwd))
     except (GitError, OSError, ValueError) as exc:
         parser.exit(2, f"error: {exc}\n")
     return 0

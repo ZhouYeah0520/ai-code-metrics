@@ -1,4 +1,6 @@
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from ai_code_metrics.fix import auto_fix
@@ -53,7 +55,6 @@ class AutoFixTests(unittest.TestCase):
         self.assertIn("--skip-git-repo-check", command)
         self.assertIn("--sandbox", command)
         self.assertIn("workspace-write", command)
-        self.assertIn("--skip-git-repo-check", command)
         self.assertNotIn("--full-auto", command)
 
     def test_cli_returns_failure_when_fix_does_not_converge(self):
@@ -67,7 +68,22 @@ class AutoFixTests(unittest.TestCase):
         self.assertEqual(
             normalize_exit_code(0, "", "[claude-code:unrecognized_model] bad model"), 1,
         )
+        self.assertEqual(normalize_exit_code(0, "", "rate_limit_exceeded"), 1)
+        self.assertEqual(normalize_exit_code(0, "", "invalid-api-key"), 1)
         self.assertEqual(normalize_exit_code(0, "OK", ""), 0)
+
+    def test_install_hook_can_target_an_explicit_repository(self):
+        with tempfile.TemporaryDirectory() as temp_dir, \
+             patch("ai_code_metrics.cli.git", side_effect=[temp_dir, ".git/hooks"]), \
+             patch("ai_code_metrics.cli.Path.mkdir") as mkdir, \
+             patch("ai_code_metrics.cli.Path.write_text") as write_text:
+            from ai_code_metrics.cli import install_hook
+            hook = install_hook(cwd=temp_dir)
+        expected = Path(temp_dir).resolve() / ".git" / "hooks" / "post-commit"
+        self.assertEqual(str(hook).lower(), str(expected).lower())
+        mkdir.assert_called_once_with(parents=True, exist_ok=True)
+        self.assertIn("--cwd", write_text.call_args.args[0])
+        self.assertIn("repo_root=$(git rev-parse --show-toplevel)", write_text.call_args.args[0])
 
 
 if __name__ == "__main__":

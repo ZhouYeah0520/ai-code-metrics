@@ -18,7 +18,7 @@ python -m ai_code_metrics list --since HEAD~5 --until HEAD
 
 `mark` 将该提交相对于第一父提交的新增/删除行数写入 `refs/notes/ai-code-metrics`。`ratio` 对指定范围逐提交汇总，避免把 `git diff HEAD`（工作区差异）误当成历史总量。二进制文件的行数由 Git 标为 `-`，不计入行数分母。合并提交不纳入 `ratio` 统计；范围内没有变更行时比率为 `null`。
 
-自动 hook 是可选项：`python -m ai_code_metrics install-hook` 安装 `post-commit` hook；只有提交信息含 `[AI]` 才会记录标记。要共享 notes，需单独推送/拉取 notes ref：`git push origin refs/notes/ai-code-metrics`。
+自动 hook 是可选项：`python -m ai_code_metrics install-hook` 安装 `post-commit` hook；只有提交信息含 `[AI]` 才会记录标记。可以用 `--cwd <仓库路径>` 指定仓库。要共享 notes，需单独推送/拉取 notes ref：`git push origin refs/notes/ai-code-metrics`。
 
 ## CLI 适配器
 
@@ -29,7 +29,7 @@ python -m ai_code_metrics run --tool claude-code "解释当前仓库结构"
 python -m ai_code_metrics run --tool codex "解释当前仓库结构"
 ```
 
-调用设置超时，不启用 shell，并将结构化输出尽可能归一成文本。此功能会把 prompt 和当前目录发送给所选 CLI；运行前确认符合你组织的数据策略。单元测试使用假的子进程结果，不会调用模型或修改仓库。
+`AgentAdapter` 为不同 CLI 统一提供可执行文件名、命令构造和输出解析；`AgentResult` 统一承载输出、错误、退出码和耗时。调用设置超时，不启用 shell，并将结构化输出尽可能归一成文本。此功能会把 prompt 和当前目录发送给所选 CLI；运行前确认符合你组织的数据策略。单元测试使用假的子进程结果，不会调用模型或修改仓库。
 
 真实调用还依赖 CLI 自身的登录、模型和 API 配置；适配器会把常见的认证、模型和服务错误转成非零退出码，即使某个 CLI 外层进程错误地返回 0，也不会被上层当成成功。
 
@@ -49,4 +49,4 @@ AI 辅助提交中的新增行数 / 范围内所有提交的新增行数。Git n
 
 ## 验证
 
-`python -m unittest discover -s tests -v` 在 Python 3.10+ 执行。CI workflow 在 push 和 pull request 时运行同一测试集。
+`python -m unittest discover -s tests -v` 在 Python 3.10+ 执行，当前包含 13 项单元测试。CI workflow 在 push 和 pull request 时运行这 13 项单元测试及 `scripts/verify_acceptance.py` 中的 14 项临时 Git 仓库验收场景；验收脚本不会调用真实模型服务。

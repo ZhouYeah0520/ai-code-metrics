@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ai_code_metrics.adapters import parse_claude_output, parse_codex_output
+from ai_code_metrics.adapters import AgentAdapter, get_adapter, parse_claude_output, parse_codex_output
 from ai_code_metrics.git import add_ai_note, ratio
 
 
@@ -53,6 +53,22 @@ class GitMetricsTests(unittest.TestCase):
 
 
 class AdapterParsingTests(unittest.TestCase):
+    def test_builtin_adapters_share_one_interface(self):
+        claude = get_adapter("claude-code")
+        codex = get_adapter("codex")
+        self.assertIsInstance(claude, AgentAdapter)
+        self.assertIsInstance(codex, AgentAdapter)
+        self.assertEqual(claude.tool, "claude-code")
+        self.assertEqual(codex.tool, "codex")
+        self.assertNotEqual(claude.executable_name, codex.executable_name)
+        self.assertEqual(claude.build_command("claude", "say hi", False), [
+            "claude", "-p", "say hi", "--output-format", "json",
+        ])
+        self.assertEqual(codex.build_command("codex", "say hi", True), [
+            "codex", "exec", "--json", "--skip-git-repo-check", "--sandbox",
+            "workspace-write", "say hi",
+        ])
+
     def test_claude_json_and_plain_fallback(self):
         self.assertEqual(parse_claude_output('{"result":"ok"}'), "ok")
         self.assertEqual(parse_claude_output("plain text"), "plain text")
